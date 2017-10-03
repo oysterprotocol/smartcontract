@@ -7,7 +7,7 @@ contract OysterPrePearl {
     string public name = "Oyster PrePearl";
     string public symbol = "PREPRL";
     uint8 public decimals = 18;
-    uint256 public totalSupply;
+    uint256 public totalSupply = 0;
     uint256 public funds = 0;
     address public owner;
     bool public saleClosed = false;
@@ -29,8 +29,6 @@ contract OysterPrePearl {
      */
     function OysterPrePearl() public {
         owner = msg.sender;
-        totalSupply = 30000000 * 10 ** uint256(decimals);
-        balanceOf[this] = totalSupply;
     }
 
     modifier onlyOwner {
@@ -48,24 +46,24 @@ contract OysterPrePearl {
 
     function () payable {
         require(!saleClosed);
-        require(msg.value >= 100 finney);//0.1 ETH
+        require(msg.value >= 1 ether);
+        require(funds + msg.value <= 3500 ether);
         uint buyPrice;
-        if (msg.value >= 200 ether) { //200 ETH
-            buyPrice = 33400;
+        if (msg.value >= 200 ether) {
+            buyPrice = 32500;//550% bonus
         }
-        else if (msg.value >= 100 ether) {// 100 ETH
-            buyPrice = 16670;
+        else if (msg.value >= 100 ether) {
+            buyPrice = 17500;//250% bonus
         }
-        else if (msg.value >= 50 ether) {// 50 ETH
-            buyPrice = 12500;
+        else if (msg.value >= 50 ether) {
+            buyPrice = 12500;//150% bonus
         }
-        else buyPrice = 10000;
+        else buyPrice = 10000;//100% bonus
         uint amount;
         amount = msg.value * buyPrice;                    // calculates the amount
-        require(balanceOf[this] >= amount);               // checks if it has enough to sell
+        totalSupply += amount;                            // increases the total supply
         balanceOf[msg.sender] += amount;                  // adds the amount to buyer's balance
-        balanceOf[this] -= amount;                        // subtracts amount from seller's balance
-        funds += msg.value;
+        funds += msg.value;                               // track eth amount raised
         Transfer(this, msg.sender, amount);               // execute an event reflecting the change
     }
 
