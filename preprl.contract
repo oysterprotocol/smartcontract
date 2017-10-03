@@ -29,7 +29,7 @@ contract OysterPrePearl {
      */
     function OysterPrePearl() public {
         owner = msg.sender;
-        totalSupply = 24000000 * 10 ** uint256(decimals);
+        totalSupply = 30000000 * 10 ** uint256(decimals);
         balanceOf[this] = totalSupply;
     }
 
@@ -48,20 +48,20 @@ contract OysterPrePearl {
 
     function () payable {
         require(!saleClosed);
-        require(msg.value >= 100 finney);//100 finney
-        uint specificPrice;
+        require(msg.value >= 100 finney);//0.1 ETH
+        uint buyPrice;
         if (msg.value >= 200 ether) { //200 ETH
-            specificPrice = 33400;
+            buyPrice = 33400;
         }
         else if (msg.value >= 100 ether) {// 100 ETH
-            specificPrice = 16670;
+            buyPrice = 16670;
         }
         else if (msg.value >= 50 ether) {// 50 ETH
-            specificPrice = 12500;
+            buyPrice = 12500;
         }
-        else specificPrice = 10000;
+        else buyPrice = 10000;
         uint amount;
-        amount = msg.value * specificPrice;               // calculates the amount
+        amount = msg.value * buyPrice;                    // calculates the amount
         require(balanceOf[this] >= amount);               // checks if it has enough to sell
         balanceOf[msg.sender] += amount;                  // adds the amount to buyer's balance
         balanceOf[this] -= amount;                        // subtracts amount from seller's balance
