@@ -5,7 +5,7 @@ interface tokenRecipient { function receiveApproval(address _from, uint256 _valu
 contract OysterPearl {
     // Public variables of the token
     string public name = "Oyster Pearl";
-    string public symbol = "PRL";
+    string public symbol = "TPRL";
     uint8 public decimals = 18;
     uint256 public totalSupply;
     uint256 public funds = 0;
@@ -15,6 +15,8 @@ contract OysterPearl {
     uint256 public claimAmount;
     uint256 public payAmount;
     uint256 public feeAmount;
+    uint256 public epoch;
+    uint256 public maxRetention;
 
     // This creates an array with all balances
     mapping (address => uint256) public balanceOf;
@@ -28,7 +30,9 @@ contract OysterPearl {
     // This notifies clients about the amount burnt
     event Burn(address indexed from, uint256 value);
 
-    event Bury(address target, uint256 value);
+    event Bury(address indexed target, uint256 value);
+
+    event Claim(address indexed payout, address indexed fee);
 
     /**
      * Constructor function
@@ -37,21 +41,24 @@ contract OysterPearl {
      */
     function OysterPearl() public {
         owner = msg.sender;
-        uint256 marketingShare = 25000000;
-        uint256 developerShare = 75000000;
-        uint256 presaleShare = 1000000;
-        totalSupply += marketingShare * 10 ** uint256(decimals);
-        totalSupply += developerShare * 10 ** uint256(decimals);
-        totalSupply += presaleShare * 10 ** uint256(decimals);
+        totalSupply = 0;
+        totalSupply += 25000000 * 10 ** uint256(decimals); //marketing share (5%)
+        totalSupply += 75000000 * 10 ** uint256(decimals); //devfund share (15%)
+        totalSupply += 1000000 * 10 ** uint256(decimals);  //allocation to match PREPRL supply
         balanceOf[owner] = totalSupply;
 
         claimAmount = 5 * 10 ** (uint256(decimals) - 1);
         payAmount = 4 * 10 ** (uint256(decimals) - 1);
         feeAmount = 1 * 10 ** (uint256(decimals) - 1);
+
+        epoch = 60;//seconds in a year 31556952
+        maxRetention = 40;//maximum time for a sector to remain stored
     }
 
     modifier onlyOwner {
+        //owner can lock themselves out to complete decentralization of Oyster network
         require(!ownerLock);
+        //lockout will occur eventually, guaranteeing Oyster decentralization
         require(block.number < 8000000);
         require(msg.sender == owner);
         _;
@@ -65,11 +72,15 @@ contract OysterPearl {
         ownerLock = true;
     }
 
-    function amendAmount(uint8 claimAmountSet, uint8 payAmountSet, uint8 feeAmountSet) public onlyOwner {
+    function amendPearl(uint8 claimAmountSet, uint8 payAmountSet, uint8 feeAmountSet, uint256 epochSet, uint256 retentionSet) public onlyOwner {
         require(claimAmountSet == (payAmountSet + feeAmountSet));
         claimAmount = claimAmountSet * 10 ** (uint256(decimals) - 1);
         payAmount = payAmountSet * 10 ** (uint256(decimals) - 1);
         feeAmount = feeAmountSet * 10 ** (uint256(decimals) - 1);
+
+        epoch = epochSet;
+
+        maxRetention = retentionSet;
     }
 
     function closeSale() public onlyOwner {
@@ -82,6 +93,7 @@ contract OysterPearl {
 
     function bury() public {
         require(balanceOf[msg.sender] > claimAmount);
+        require(balanceOf[msg.sender] < maxRetention);
         require(!buried[msg.sender]);
         buried[msg.sender] = true;
         claimed[msg.sender] = 1;
@@ -90,17 +102,18 @@ contract OysterPearl {
 
     function claim(address _payout, address _fee) public {
         require(buried[msg.sender]);
-        require(claimed[msg.sender] == 1 || (block.timestamp - claimed[msg.sender]) >= 31556952);
+        require(claimed[msg.sender] == 1 || (block.timestamp - claimed[msg.sender]) >= epoch);
         require(balanceOf[msg.sender] >= claimAmount);
         claimed[msg.sender] = block.timestamp;
         balanceOf[msg.sender] -= claimAmount;
         balanceOf[_payout] -= payAmount;
         balanceOf[_fee] -= feeAmount;
+        Claim(_payout, _fee);
     }
 
     function () payable public {
         require(!saleClosed);
-        require(msg.value >= 100 finney);
+        require(msg.value >= 1 finney);
         uint256 amount = msg.value * 5000;                // calculates the amount
         require(totalSupply + amount <= (500000000 * 10 ** uint256(decimals)));
         totalSupply += amount;                            // increases the total supply
