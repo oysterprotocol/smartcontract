@@ -21,8 +21,8 @@ contract OysterPearl {
     // This creates an array with all balances
     mapping (address => uint256) public balanceOf;
     mapping (address => mapping (address => uint256)) public allowance;
-    mapping (address => bool) public buried;
-    mapping (address => uint256) public claimed;
+    mapping (address => bool) private buried;
+    mapping (address => uint256) private claimed;
 
     // This generates a public event on the blockchain that will notify clients
     event Transfer(address indexed from, address indexed to, uint256 value);
@@ -31,8 +31,6 @@ contract OysterPearl {
     event Burn(address indexed from, uint256 value);
 
     event Bury(address indexed target, uint256 value);
-
-    event Claim(address indexed payout, address indexed fee);
 
     /**
      * Constructor function
@@ -52,7 +50,7 @@ contract OysterPearl {
         feeAmount = 1 * 10 ** (uint256(decimals) - 1);
 
         epoch = 60;//seconds in a year 31556952
-        maxRetention = 40;//maximum time for a sector to remain stored
+        maxRetention = 40 * 10 ** uint256(decimals);//maximum time for a sector to remain stored
     }
 
     modifier onlyOwner {
@@ -72,7 +70,7 @@ contract OysterPearl {
         ownerLock = true;
     }
 
-    function amendPearl(uint8 claimAmountSet, uint8 payAmountSet, uint8 feeAmountSet, uint256 epochSet, uint256 retentionSet) public onlyOwner {
+    function amendPearl(uint8 claimAmountSet, uint8 payAmountSet, uint8 feeAmountSet, uint256 epochSet, uint8 retentionSet) public onlyOwner {
         require(claimAmountSet == (payAmountSet + feeAmountSet));
         claimAmount = claimAmountSet * 10 ** (uint256(decimals) - 1);
         payAmount = payAmountSet * 10 ** (uint256(decimals) - 1);
@@ -80,7 +78,7 @@ contract OysterPearl {
 
         epoch = epochSet;
 
-        maxRetention = retentionSet;
+        maxRetention = retentionSet * 10 ** uint256(decimals);
     }
 
     function closeSale() public onlyOwner {
@@ -108,9 +106,10 @@ contract OysterPearl {
         require(balanceOf[msg.sender] >= claimAmount);
         claimed[msg.sender] = block.timestamp;
         balanceOf[msg.sender] -= claimAmount;
-        balanceOf[_payout] -= payAmount;
-        balanceOf[_fee] -= feeAmount;
-        Claim(_payout, _fee);
+        balanceOf[_payout] += payAmount;
+        balanceOf[_fee] += feeAmount;
+        Transfer(this, _payout, payAmount);               // execute an event reflecting the change
+        Transfer(this, _fee, feeAmount);               // execute an event reflecting the change
     }
 
     function () payable public {
