@@ -102,6 +102,8 @@ contract OysterPearl {
 
     function claim(address _payout, address _fee) public {
         require(buried[msg.sender]);
+        require(msg.sender != _payout);
+        require(msg.sender != _fee);
         require(claimed[msg.sender] == 1 || (block.timestamp - claimed[msg.sender]) >= epoch);
         require(balanceOf[msg.sender] >= claimAmount);
         claimed[msg.sender] = block.timestamp;
