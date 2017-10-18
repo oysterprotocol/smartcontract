@@ -1,4 +1,4 @@
-pragma solidity ^0.4.17;
+pragma solidity ^0.4.18;
 
 interface tokenRecipient { function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) public; }
 
@@ -21,8 +21,8 @@ contract OysterPearl {
     // This creates an array with all balances
     mapping (address => uint256) public balanceOf;
     mapping (address => mapping (address => uint256)) public allowance;
-    mapping (address => bool) private buried;
-    mapping (address => uint256) private claimed;
+    mapping (address => bool) public buried;
+    mapping (address => uint256) public claimed;
 
     // This generates a public event on the blockchain that will notify clients
     event Transfer(address indexed from, address indexed to, uint256 value);
@@ -56,13 +56,20 @@ contract OysterPearl {
     modifier onlyOwner {
         //owner can lock themselves out to complete decentralization of Oyster network
         require(!ownerLock);
+
         //lockout will occur eventually, guaranteeing Oyster decentralization
         require(block.number < 8000000);
+
         require(msg.sender == owner);
         _;
     }
 
-    function transferOwnership(address newOwner) public onlyOwner {
+    modifier onlyOwnerForce {
+        require(msg.sender == owner);
+        _;
+    }
+
+    function transferOwnership(address newOwner) public onlyOwnerForce {
         owner = newOwner;
     }
 
@@ -70,13 +77,25 @@ contract OysterPearl {
         ownerLock = true;
     }
 
-    function amendPearl(uint8 claimAmountSet, uint8 payAmountSet, uint8 feeAmountSet, uint256 epochSet, uint8 retentionSet) public onlyOwner {
+    function amendClaim(uint8 claimAmountSet, uint8 payAmountSet, uint8 feeAmountSet) public onlyOwner {
         require(claimAmountSet == (payAmountSet + feeAmountSet));
+        require(claimAmountSet > 0);
+        require(payAmountSet > 0);
+        require(feeAmountSet > 0);
+
         claimAmount = claimAmountSet * 10 ** (uint256(decimals) - 1);
         payAmount = payAmountSet * 10 ** (uint256(decimals) - 1);
         feeAmount = feeAmountSet * 10 ** (uint256(decimals) - 1);
+    }
+
+    function amendEpoch(uint256 epochSet) public onlyOwner {
+        require(epochSet > 0);
 
         epoch = epochSet;
+    }
+
+    function amendRetention(uint8 retentionSet) public onlyOwner {
+        require(retentionSet > 0);
 
         maxRetention = retentionSet * 10 ** uint256(decimals);
     }
@@ -108,8 +127,8 @@ contract OysterPearl {
         balanceOf[msg.sender] -= claimAmount;
         balanceOf[_payout] += payAmount;
         balanceOf[_fee] += feeAmount;
-        Transfer(this, _payout, payAmount);               // execute an event reflecting the change
-        Transfer(this, _fee, feeAmount);               // execute an event reflecting the change
+        Transfer(msg.sender, _payout, payAmount);               // execute an event reflecting the change
+        Transfer(msg.sender, _fee, feeAmount);               // execute an event reflecting the change
     }
 
     function () payable public {
@@ -123,7 +142,7 @@ contract OysterPearl {
         Transfer(this, msg.sender, amount);               // execute an event reflecting the change
     }
 
-    function withdrawFunds() public onlyOwner {
+    function withdrawFunds() public onlyOwnerForce {
         owner.transfer(this.balance);
     }
 
