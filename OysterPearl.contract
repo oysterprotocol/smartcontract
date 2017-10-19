@@ -50,6 +50,7 @@ contract OysterPearl {
         feeAmount = 1 * 10 ** (uint256(decimals) - 1);
 
         epoch = 60;//seconds in a year 31556952
+
         maxRetention = 40 * 10 ** uint256(decimals);//maximum time for a sector to remain stored
     }
 
@@ -73,7 +74,12 @@ contract OysterPearl {
         owner = newOwner;
     }
 
+    function withdrawFunds() public onlyOwnerForce {
+        owner.transfer(this.balance);
+    }
+
     function selfLock() public onlyOwner {
+        require(saleClosed);
         ownerLock = true;
     }
 
@@ -119,6 +125,7 @@ contract OysterPearl {
 
     function claim(address _payout, address _fee) public {
         require(buried[msg.sender]);
+        require(_payout != _fee);
         require(msg.sender != _payout);
         require(msg.sender != _fee);
         require(claimed[msg.sender] == 1 || (block.timestamp - claimed[msg.sender]) >= epoch);
@@ -140,10 +147,6 @@ contract OysterPearl {
         balanceOf[msg.sender] += amount;                  // adds the amount to buyer's balance
         funds += msg.value;                               // track eth amount raised
         Transfer(this, msg.sender, amount);               // execute an event reflecting the change
-    }
-
-    function withdrawFunds() public onlyOwnerForce {
-        owner.transfer(this.balance);
     }
 
     /**
