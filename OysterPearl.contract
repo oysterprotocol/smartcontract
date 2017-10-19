@@ -4,36 +4,39 @@ interface tokenRecipient { function receiveApproval(address _from, uint256 _valu
 
 contract OysterPearl {
     // Public variables of PRL
-    string public name = "Oyster Pearl";
-    string public symbol = "TPRL";
-    uint8 public decimals = 18;
+    string public name;
+    string public symbol;
+    uint8 public decimals;
     uint256 public totalSupply;
-    uint256 public funds = 0;
+    uint256 public funds;
     address public owner;
-    bool public saleClosed = true;
-    bool public ownerLock = false;
+    bool public saleClosed;
+    bool public ownerLock;
     uint256 public claimAmount;
     uint256 public payAmount;
     uint256 public feeAmount;
     uint256 public epoch;
     uint256 public retentionMax;
 
-    //this creates an array with all balances
+    // This creates an array with all balances
     mapping (address => uint256) public balanceOf;
     mapping (address => mapping (address => uint256)) public allowance;
     mapping (address => bool) public buried;
     mapping (address => uint256) public claimed;
 
-    //this generates a public event on the blockchain that will notify clients
+    // This generates a public event on the blockchain that will notify clients
     event Transfer(address indexed from, address indexed to, uint256 value);
 
-    //this notifies clients about the amount burnt
+    // This generates a public event on the blockchain that will notify clients
+    event Approval(address indexed _owner, address indexed _spender, uint256 _value);
+
+    // This notifies clients about the amount burnt
     event Burn(address indexed from, uint256 value);
 
-    //this notifies clients about the an address getting buried
+    // This notifies clients about the an address getting buried
     event Bury(address indexed target, uint256 value);
 
-    //this notifies clients about a claim being made on a buried address
+    // This notifies clients about a claim being made on a buried address
     event Claim(address indexed target, address indexed payout, address indexed fee);
 
     /**
@@ -43,13 +46,24 @@ contract OysterPearl {
      */
     function OysterPearl() public {
         owner = msg.sender;
+        name = "Oyster Pearl";
+        symbol = "TPRL";
+        decimals = 18;
+        funds = 0;
         totalSupply = 0;
-        //marketing share (5%)
+        saleClosed = true;
+        ownerLock = false;
+
+        // Marketing share (5%)
         totalSupply += 25000000 * 10 ** uint256(decimals);
-        //devfund share (15%)
+
+        // Devfund share (15%)
         totalSupply += 75000000 * 10 ** uint256(decimals);
-        //allocation to match PREPRL supply
+
+        // Allocation to match PREPRL supply
         totalSupply += 1000000 * 10 ** uint256(decimals);
+
+        // Assign reserved PRL supply to contract owner
         balanceOf[owner] = totalSupply;
 
         claimAmount = 5 * 10 ** (uint256(decimals) - 1);
@@ -61,6 +75,20 @@ contract OysterPearl {
 
         //Maximum time for a sector to remain stored
         retentionMax = 40 * 10 ** uint256(decimals);
+    }
+
+    /**
+     * ERC20 function
+     */
+    function totalSupply() public constant returns (uint256 totalSupplyReturn) {
+        return totalSupply;
+    }
+
+    /**
+     * ERC20 function
+     */
+    function balanceOf(address _owner) public constant returns (uint256 balance) {
+        return balanceOf[_owner];
     }
 
     modifier onlyOwner {
@@ -342,6 +370,8 @@ contract OysterPearl {
         require(!buried[_spender]);
 
         allowance[msg.sender][_spender] = _value;
+
+        Approval(msg.sender, _spender, _value);
         return true;
     }
 
