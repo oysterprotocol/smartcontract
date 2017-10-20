@@ -49,10 +49,10 @@ contract OysterPearl {
         name = "Oyster Pearl";
         symbol = "PRL";
         decimals = 18;
-        funds = 0;
-        totalSupply = 0;
         saleClosed = true;
         directorLock = false;
+        funds = 0;
+        totalSupply = 0;
 
         // Marketing share (5%)
         totalSupply += 25000000 * 10 ** uint256(decimals);
@@ -134,50 +134,55 @@ contract OysterPearl {
     /**
      * Director can alter the storage-peg and broker fees
      */
-    function amendClaim(uint8 claimAmountSet, uint8 payAmountSet, uint8 feeAmountSet, uint8 accuracy) public onlyDirector {
+    function amendClaim(uint8 claimAmountSet, uint8 payAmountSet, uint8 feeAmountSet, uint8 accuracy) public onlyDirector returns (bool success) {
         require(claimAmountSet == (payAmountSet + feeAmountSet));
 
         claimAmount = claimAmountSet * 10 ** (uint256(decimals) - accuracy);
         payAmount = payAmountSet * 10 ** (uint256(decimals) - accuracy);
         feeAmount = feeAmountSet * 10 ** (uint256(decimals) - accuracy);
+        return true;
     }
 
     /**
      * Director can alter the epoch time
      */
-    function amendEpoch(uint256 epochSet) public onlyDirector {
+    function amendEpoch(uint256 epochSet) public onlyDirector returns (bool success) {
         // Set the epoch
         epoch = epochSet;
+        return true;
     }
 
     /**
      * Director can alter the maximum time of storage retention
      */
-    function amendRetention(uint8 retentionSet, uint8 accuracy) public onlyDirector {
+    function amendRetention(uint8 retentionSet, uint8 accuracy) public onlyDirector returns (bool success) {
         // Set retentionMax
         retentionMax = retentionSet * 10 ** (uint256(decimals) - accuracy);
+        return true;
     }
 
     /**
      * Director can close the crowdsale
      */
-    function closeSale() public onlyDirector {
+    function closeSale() public onlyDirector returns (bool success) {
         // The sale must be currently open
         require(!saleClosed);
 
         // Lock the crowdsale
         saleClosed = true;
+        return true;
     }
 
     /**
      * Director can open the crowdsale
      */
-    function openSale() public onlyDirector {
+    function openSale() public onlyDirector returns (bool success) {
         // The sale must be currently closed
         require(saleClosed);
 
         // Unlock the crowdsale
         saleClosed = false;
+        return true;
     }
 
     /**
@@ -239,7 +244,7 @@ contract OysterPearl {
         // Check if the buried address has enough
         require(balances[msg.sender] >= claimAmount);
 
-        // Reset the claim clock to the current time
+        // Reset the claim clock to the current block time
         claimed[msg.sender] = block.timestamp;
 
         // Save this for an assertion in the future
@@ -267,7 +272,7 @@ contract OysterPearl {
     /**
      * Crowdsale function
      */
-    function () payable public {
+    function () public payable {
         // Check if crowdsale is still active
         require(!saleClosed);
 
@@ -283,7 +288,7 @@ contract OysterPearl {
         // Increases the total supply
         totalSupply += amount;
 
-        // Adds the amount to buyer's balance
+        // Adds the amount to the balance
         balances[msg.sender] += amount;
 
         // Track ETH amount raised
@@ -360,15 +365,15 @@ contract OysterPearl {
     /**
      * Set allowance for other address
      *
-     * Allows `_spender` to spend no more than `_value` tokens in your behalf
+     * Allows `_spender` to spend no more than `_value` tokens on your behalf
      *
      * @param _spender the address authorized to spend
      * @param _value the max amount they can spend
      */
-    function approve(address _spender, uint256 _value) public
-        returns (bool success) {
+    function approve(address _spender, uint256 _value) public returns (bool success) {
         // Buried addresses cannot be approved
-        require(!buried[_spender]);
+        require(!buried[msg.sender]);
+
         allowance[msg.sender][_spender] = _value;
         Approval(msg.sender, _spender, _value);
         return true;
@@ -377,15 +382,13 @@ contract OysterPearl {
     /**
      * Set allowance for other address and notify
      *
-     * Allows `_spender` to spend no more than `_value` tokens in your behalf, and then ping the contract about it
+     * Allows `_spender` to spend no more than `_value` tokens on your behalf, and then ping the contract about it
      *
      * @param _spender the address authorized to spend
      * @param _value the max amount they can spend
      * @param _extraData some extra information to send to the approved contract
      */
-    function approveAndCall(address _spender, uint256 _value, bytes _extraData)
-        public
-        returns (bool success) {
+    function approveAndCall(address _spender, uint256 _value, bytes _extraData) public returns (bool success) {
         tokenRecipient spender = tokenRecipient(_spender);
         if (approve(_spender, _value)) {
             spender.receiveApproval(msg.sender, _value, this, _extraData);
