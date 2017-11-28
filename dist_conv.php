@@ -10,7 +10,7 @@ if ($fh) {
     $stake_total = "0";
     $stake_super_total = "0";
     while (($line = fgets($fh)) !== false) {
-        $parts = explode(",", $line);
+        $parts = explode("-", $line);
         $stake = bcmul(trim(array_values(array_slice($parts, 1))[0]), $multi);
         $address = trim(array_values(array_slice($parts, 0))[0]);
         if ($stake > 0 && strlen($address)==42 && substr($address, 0, 2)=="0x") {
