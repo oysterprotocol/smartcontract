@@ -1,7 +1,7 @@
 // Truffle Networking Configuration
 // We set live to point to Oysterby Testnet
 // Oysterby Port : 8080
-// Ganache Port  : 9545
+// Ganache Port  : 7545
 // Deployments using truffle
 //
 // Migration to live Oysterby private network
@@ -20,8 +20,10 @@ module.exports = {
     },
     development: {
       host: "127.0.0.1",
-      port: 9545,
-      network_id: "*" // Match any network id
+      port: 7545,
+      network_id: "*", // Match any network id
+      gas: 4e6,
+      gasPrice: 2e10
     }
   }
 };
