@@ -14,16 +14,20 @@
 module.exports = {
   networks: {
     live: {
-      network_id: 1,
+      network_id: 559966,
       host: "54.197.3.171",
       port: 8080   // Different than the default below
     },
     development: {
+      network_id: "*", // Match any network id
       host: "127.0.0.1",
       port: 7545,
-      network_id: "*", // Match any network id
       gas: 4e6,
       gasPrice: 2e10
     }
+  },
+  rpc: {
+    host: "127.0.0.1",
+    port: 7545
   }
 };
