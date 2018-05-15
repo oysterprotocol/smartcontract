@@ -5,7 +5,7 @@ interface OysterPearl {
     function transfer(address _to, uint256 _value) public;
 }
 
-contract PearlDistributePrice {
+contract PearlDistribute {
     uint256 public price;
     uint256 public multi;
     uint256 public calcAmount;
