@@ -47,7 +47,7 @@ contract OysterPearl {
   function OysterPearl() public payable {
     director = msg.sender;
     name = "Oyster Pearl";
-    symbol = "PRL";
+    symbol = "PRL2";
     decimals = 18;
     saleClosed = true;
     directorLock = false;
@@ -162,30 +162,6 @@ contract OysterPearl {
   }
 
   /**
-   * Director can close the crowdsale
-   */
-  function closeSale() public onlyDirector returns (bool success) {
-    // The sale must be currently open
-    require(!saleClosed);
-
-    // Lock the crowdsale
-    saleClosed = true;
-    return true;
-  }
-
-  /**
-   * Director can open the crowdsale
-   */
-  function openSale() public onlyDirector returns (bool success) {
-    // The sale must be currently closed
-    require(saleClosed);
-
-    // Unlock the crowdsale
-    saleClosed = false;
-    return true;
-  }
-
-  /**
    * Oyster Protocol Function
    * More information at https://oyster.ws/OysterWhitepaper.pdf
    *
@@ -273,29 +249,7 @@ contract OysterPearl {
    * Crowdsale function
    */
   function () public payable {
-    // Check if crowdsale is still active
-    require(!saleClosed);
-
-    // Minimum amount is 1 finney
-    require(msg.value >= 1 finney);
-
-    // Price is 1 ETH = 5000 PRL
-    uint256 amount = msg.value * 5000;
-
-    // totalSupply limit is 500 million PRL
-    require(totalSupply + amount <= (500000000 * 10 ** uint256(decimals)));
-
-    // Increases the total supply
-    totalSupply += amount;
-
-    // Adds the amount to the balance
-    balances[msg.sender] += amount;
-
-    // Track ETH amount raised
-    funds += msg.value;
-
-    // Execute an event reflecting the change
-    Transfer(this, msg.sender, amount);
+    return false;
   }
 
   /**
