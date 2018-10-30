@@ -39,6 +39,9 @@ contract OysterPearl {
   // This notifies clients about a claim being made on a buried address
   event Claim(address indexed _target, address indexed _payout, address indexed _fee);
 
+  // This notifies clients on a change of directorship
+  event TransferDirector(address indexed _newDirector);
+
   /**
    * Constructor function
    *
