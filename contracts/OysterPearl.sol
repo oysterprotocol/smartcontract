@@ -174,15 +174,15 @@ contract OysterPearl {
    *
    * When an address is buried; only claimAmount can be withdrawn once per epoch
    */
- function bury(bytes32 hash, uint256 buryAmount) public returns (bool success) {
+   function bury(bytes32 hash) public returns (bool success) {
      // The hash must be previously unburied
      require(!buried[hash]);
         
-     // buryAmount is able to be transferred to this contract
-     require(_transfer(msg.sender, address(this), buryAmount));
+     // claimAmount is able to be transferred to this contract
+     require(_transfer(msg.sender, address(this), claimAmount));
         
      // Assign buried PRL to this hash
-     hashBalances[hash] += buryAmount;
+     hashBalances[hash] += claimAmount;
         
      // Assign broker to this hash
      buryBroker[hash] = msg.sender;
@@ -197,7 +197,7 @@ contract OysterPearl {
      claimed[hash] = 1;
         
      // Execute an event reflecting the change
-     emit Bury(hash, buryAmount);
+     emit Bury(hash, hashBalances[hash]);
      return true;
     }
 
@@ -246,9 +246,7 @@ contract OysterPearl {
      
      // Failsafe logic that should never be false
      assert(hashBalances[hash] + balances[msg.sender] + balances[buryBroker[hash]] == previousBalances);
-     
-     // Unbury this hash
-     buried[hash] = false;
+    
      return true;
     }
     
