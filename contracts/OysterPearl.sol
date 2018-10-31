@@ -17,7 +17,6 @@ contract OysterPearl {
   uint256 public feeAmount;
   uint256 public epoch;
   uint256 public retentionMax;
-  uint256 public minWithdraw;
 
   // Array definitions
   mapping (bytes32 => uint256) public hashBalances;
@@ -50,7 +49,7 @@ contract OysterPearl {
    *
    * Initializes contract
    */
-  function OysterPearl() public payable {
+  constructor() public payable {
     director = msg.sender;
     name = "Oyster Pearl";
     symbol = "PRL2";
@@ -59,7 +58,6 @@ contract OysterPearl {
     directorLock = false;
     funds = 0;
     totalSupply = 0;
-    minWithdraw = 10;
 
     // Marketing share (5%)
     totalSupply += 25000000 * 10 ** uint256(decimals);
@@ -199,7 +197,7 @@ contract OysterPearl {
      claimed[hash] = 1;
         
      // Execute an event reflecting the change
-     emit Bury(hash, hashBalances[hash]);
+     emit Bury(hash, buryAmount);
      return true;
     }
 
@@ -252,6 +250,10 @@ contract OysterPearl {
      // Unbury this hash
      buried[hash] = false;
      return true;
+    }
+    
+    function getHashBalances(bytes32 hash) public view returns(uint256){
+        return hashBalances[hash];
     }
     
 
