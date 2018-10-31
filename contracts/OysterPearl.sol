@@ -17,28 +17,31 @@ contract OysterPearl {
   uint256 public feeAmount;
   uint256 public epoch;
   uint256 public retentionMax;
+  uint256 public minWithdraw;
 
   // Array definitions
+  mapping (bytes32 => uint256) public hashBalances;
   mapping (address => uint256) public balances;
   mapping (address => mapping (address => uint256)) public allowance;
-  mapping (address => bool) public buried;
-  mapping (address => uint256) public claimed;
+  mapping (bytes32 => bool) public buried;
+  mapping (bytes32 => uint256) public claimed;
+  mapping (bytes32 => address) public buryBroker;
 
   // ERC20 event
   event Transfer(address indexed _from, address indexed _to, uint256 _value);
-
+    
   // ERC20 event
   event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 
   // This notifies clients about the amount burnt
   event Burn(address indexed _from, uint256 _value);
-
+    
   // This notifies clients about an address getting buried
-  event Bury(address indexed _target, uint256 _value);
-
-  // This notifies clients about a claim being made on a buried address
-  event Claim(address indexed _target, address indexed _payout, address indexed _fee);
-
+  event Bury(bytes32 indexed _target, uint256 _value);
+    
+  // This notifies clients about a claim being made on a buried hash
+  event Claim(bytes32 hash, address indexed _payout, address indexed _fee);
+ 
   // This notifies clients on a change of directorship
   event TransferDirector(address indexed _newDirector);
 
@@ -56,6 +59,7 @@ contract OysterPearl {
     directorLock = false;
     funds = 0;
     totalSupply = 0;
+    minWithdraw = 10;
 
     // Marketing share (5%)
     totalSupply += 25000000 * 10 ** uint256(decimals);
@@ -172,26 +176,32 @@ contract OysterPearl {
    *
    * When an address is buried; only claimAmount can be withdrawn once per epoch
    */
-  function bury() public returns (bool success) {
-    // The address must be previously unburied
-    require(!buried[msg.sender]);
-
-    // An address must have at least claimAmount to be buried
-    require(balances[msg.sender] >= claimAmount);
-
-    // Prevent addresses with large balances from getting buried
-    require(balances[msg.sender] <= retentionMax);
-
-    // Set buried state to true
-    buried[msg.sender] = true;
-
-    // Set the initial claim clock to 1
-    claimed[msg.sender] = 1;
-
-    // Execute an event reflecting the change
-    Bury(msg.sender, balances[msg.sender]);
-    return true;
-  }
+ function bury(bytes32 hash, uint256 buryAmount) public returns (bool success) {
+     // The hash must be previously unburied
+     require(!buried[hash]);
+        
+     // buryAmount is able to be transferred to this contract
+     require(_transfer(msg.sender, address(this), buryAmount));
+        
+     // Assign buried PRL to this hash
+     hashBalances[hash] += buryAmount;
+        
+     // Assign broker to this hash
+     buryBroker[hash] = msg.sender;
+        
+     // An address must have at least claimAmount to be buried
+     require(hashBalances[hash] >= claimAmount);
+        
+     // Set buried state to true
+     buried[hash] = true;
+        
+     // Set the initial claim clock to 1
+     claimed[hash] = 1;
+        
+     // Execute an event reflecting the change
+     emit Bury(hash, hashBalances[hash]);
+     return true;
+    }
 
   /**
    * Oyster Protocol Function
@@ -200,72 +210,55 @@ contract OysterPearl {
    * Claim PRL from a buried address
    *
    * If a prior claim wasn't made during the current epoch, then claimAmount can be withdrawn
-   *
-   * @param _payout the address of the website owner
-   * @param _fee the address of the broker node
    */
-  function claim(address _payout, address _fee) public returns (bool success) {
-    // The claimed address must have already been buried
-    require(buried[msg.sender]);
-
-    // The payout and fee addresses must be different
-    require(_payout != _fee);
-
-    // The claimed address cannot pay itself
-    require(msg.sender != _payout);
-
-    // The claimed address cannot pay itself
-    require(msg.sender != _fee);
-
-    // It must be either the first time this address is being claimed or atleast epoch in time has passed
-    require(claimed[msg.sender] == 1 || (block.timestamp - claimed[msg.sender]) >= epoch);
-
-    // Check if the buried address has enough
-    require(balances[msg.sender] >= claimAmount);
-
-    // Reset the claim clock to the current block time
-    claimed[msg.sender] = block.timestamp;
-
-    // Save this for an assertion in the future
-    uint256 previousBalances = balances[msg.sender] + balances[_payout] + balances[_fee];
-
-    // Remove claimAmount from the buried address
-    balances[msg.sender] -= claimAmount;
-
-    // Pay the website owner that invoked the web node that found the PRL seed key
-    balances[_payout] += payAmount;
-
-    // Pay the broker node that unlocked the PRL
-    balances[_fee] += feeAmount;
-
-    // Execute events to reflect the changes
-    Claim(msg.sender, _payout, _fee);
-    Transfer(msg.sender, _payout, payAmount);
-    Transfer(msg.sender, _fee, feeAmount);
-
-    // Failsafe logic that should never be false
-    assert(balances[msg.sender] + balances[_payout] + balances[_fee] == previousBalances);
-    return true;
-  }
-
-  /**
-   * Crowdsale function
-   */
-  function () public payable {
-    return false;
-  }
+    function claim(bytes32 hash, bytes32 privateKey) public returns (bool success) {
+     
+     // Hash must be hash from private Key
+     require(keccak256(privateKey) == hash);
+        
+     // The claimed address must have already been buried
+     require(buried[hash]);
+        
+     // It must be either the first time this address is being claimed or atleast epoch in time has passed
+     require(claimed[hash] == 1 || (block.timestamp - claimed[hash]) >= epoch);
+        
+     // Check if the buried address has enough
+     require(hashBalances[hash] >= claimAmount);
+        
+     // Reset the claim clock to the current block time
+     claimed[hash] = block.timestamp;
+     
+     // Save this for an assertion in the future
+     uint256 previousBalances = hashBalances[hash] + balances[msg.sender] + balances[buryBroker[hash]];
+        
+     // Remove claimAmount from the buried hashBalance
+     hashBalances[hash] -= claimAmount;
+     
+     // Remove claimAmount from this contract
+     balances[address(this)] -= claimAmount;
+        
+     // Pay the website owner that invoked the web node that found the PRL seed key
+     balances[msg.sender] += payAmount;
+        
+     // Pay the broker node that unlocked the PRL
+     balances[buryBroker[hash]] += feeAmount;
+        
+     // Execute events to reflect the changes
+     emit Claim(hash, msg.sender, buryBroker[hash]);
+     
+     // Failsafe logic that should never be false
+     assert(hashBalances[hash] + balances[msg.sender] + balances[buryBroker[hash]] == previousBalances);
+     
+     // Unbury this hash
+     buried[hash] = false;
+     return true;
+    }
+    
 
   /**
    * Internal transfer, can be called by this contract only
    */
-  function _transfer(address _from, address _to, uint _value) internal {
-    // Sending addresses cannot be buried
-    require(!buried[_from]);
-
-    // If the receiving address is buried, it cannot exceed retentionMax
-    if (buried[_to]) {
-      require(balances[_to] + _value <= retentionMax);
-    }
+  function _transfer(address _from, address _to, uint _value) internal returns (bool success) {
 
     // Prevent transfer to 0x0 address, use burn() instead
     require(_to != 0x0);
@@ -284,10 +277,12 @@ contract OysterPearl {
 
     // Add the same to the recipient
     balances[_to] += _value;
-    Transfer(_from, _to, _value);
+    emit Transfer(_from, _to, _value);
 
     // Failsafe logic that should never be false
     assert(balances[_from] + balances[_to] == previousBalances);
+    
+    return true;
   }
 
   /**
@@ -328,11 +323,10 @@ contract OysterPearl {
    * @param _value the max amount they can spend
    */
   function approve(address _spender, uint256 _value) public returns (bool success) {
-    // Buried addresses cannot be approved
-    require(!buried[msg.sender]);
+
 
     allowance[msg.sender][_spender] = _value;
-    Approval(msg.sender, _spender, _value);
+    emit Approval(msg.sender, _spender, _value);
     return true;
   }
 
@@ -361,8 +355,6 @@ contract OysterPearl {
    * @param _value the amount of money to burn
    */
   function burn(uint256 _value) public returns (bool success) {
-    // Buried addresses cannot be burnt
-    require(!buried[msg.sender]);
 
     // Check if the sender has enough
     require(balances[msg.sender] >= _value);
@@ -372,7 +364,7 @@ contract OysterPearl {
 
     // Updates totalSupply
     totalSupply -= _value;
-    Burn(msg.sender, _value);
+    emit Burn(msg.sender, _value);
     return true;
   }
 
@@ -385,8 +377,6 @@ contract OysterPearl {
    * @param _value the amount of money to burn
    */
   function burnFrom(address _from, uint256 _value) public returns (bool success) {
-    // Buried addresses cannot be burnt
-    require(!buried[_from]);
 
     // Check if the targeted balance is enough
     require(balances[_from] >= _value);
@@ -402,7 +392,7 @@ contract OysterPearl {
 
     // Update totalSupply
     totalSupply -= _value;
-    Burn(_from, _value);
+    emit Burn(_from, _value);
     return true;
   }
 }
