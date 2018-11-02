@@ -192,9 +192,6 @@ contract OysterPearl {
      // Assign broker to this hash
      buryBroker[hash] = msg.sender;
         
-     // An address must have at least claimAmount to be buried
-     require(hashBalances[hash] >= claimAmount);
-        
      // Set buried state to true
      buried[hash] = true;
 
