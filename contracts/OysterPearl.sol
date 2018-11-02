@@ -13,8 +13,8 @@ contract OysterPearl {
   bool public saleClosed;
   bool public directorLock;
   uint256 public claimAmount;
-  uint256 public payAmount;
-  uint256 public feeAmount;
+  uint256 public payPercentage:
+  uint256 public feePercentage;
   uint256 public epoch;
   uint256 public retentionMax;
 
@@ -23,7 +23,6 @@ contract OysterPearl {
   mapping (address => uint256) public balances;
   mapping (address => mapping (address => uint256)) public allowance;
   mapping (bytes32 => bool) public buried;
-  mapping (bytes32 => uint256) public claimed;
   mapping (bytes32 => address) public buryBroker;
 
   // ERC20 event
@@ -73,8 +72,8 @@ contract OysterPearl {
 
     // Define default values for Oyster functions
     claimAmount = 5 * 10 ** (uint256(decimals) - 1);
-    payAmount = 4 * 10 ** (uint256(decimals) - 1);
-    feeAmount = 1 * 10 ** (uint256(decimals) - 1);
+    payPercentage = 80;
+    feePercentage = 20;
 
     // Seconds in a year
     epoch = 31536000;
@@ -131,6 +130,9 @@ contract OysterPearl {
 
     // Prevents accidental lockout
     require(msg.value == 10 ether);
+    
+    // refunds security
+    director.transfer(10 ether);
 
     // Permanently lock out the director
     directorLock = true;
@@ -139,12 +141,15 @@ contract OysterPearl {
   /**
    * Director can alter the storage-peg and broker fees
    */
-  function amendClaim(uint8 claimAmountSet, uint8 payAmountSet, uint8 feeAmountSet, uint8 accuracy) public onlyDirector returns (bool success) {
-    require(claimAmountSet == (payAmountSet + feeAmountSet));
+  function amendClaim(uint8 _claimAmount, uint8 _payPercentage, uint8 _feePercentage, uint8 accuracy) public onlyDirector returns (bool success) {
+    require((_payPercentage + _feePercentage) == 100)
+    require(_payPercentage >= 0);
+    require(_feePercentage >= 0);
 
-    claimAmount = claimAmountSet * 10 ** (uint256(decimals) - accuracy);
-    payAmount = payAmountSet * 10 ** (uint256(decimals) - accuracy);
-    feeAmount = feeAmountSet * 10 ** (uint256(decimals) - accuracy);
+    claimAmount = claimAmount * 10 ** (uint256(decimals) - accuracy);
+    payPercentage = _payPercentage;
+    feePercentage = _feePercentage;
+    
     return true;
   }
 
@@ -192,9 +197,7 @@ contract OysterPearl {
         
      // Set buried state to true
      buried[hash] = true;
-        
-     // Set the initial claim clock to 1
-     claimed[hash] = 1;
+
         
      // Execute an event reflecting the change
      emit Bury(hash, hashBalances[hash]);
@@ -217,29 +220,23 @@ contract OysterPearl {
      // The claimed address must have already been buried
      require(buried[hash]);
         
-     // It must be either the first time this address is being claimed or atleast epoch in time has passed
-     require(claimed[hash] == 1 || (block.timestamp - claimed[hash]) >= epoch);
-        
      // Check if the buried address has enough
      require(hashBalances[hash] >= claimAmount);
-        
-     // Reset the claim clock to the current block time
-     claimed[hash] = block.timestamp;
      
      // Save this for an assertion in the future
      uint256 previousBalances = hashBalances[hash] + balances[msg.sender] + balances[buryBroker[hash]];
-        
-     // Remove claimAmount from the buried hashBalance
-     hashBalances[hash] -= claimAmount;
      
      // Remove claimAmount from this contract
-     balances[address(this)] -= claimAmount;
-        
+     balances[address(this)] -= hashBalances[hash]
+     
      // Pay the website owner that invoked the web node that found the PRL seed key
-     balances[msg.sender] += payAmount;
+     balances[msg.sender] += hashBalances[hash] * payPercentage / 100
         
      // Pay the broker node that unlocked the PRL
-     balances[buryBroker[hash]] += feeAmount;
+     balances[buryBroker[hash]] += hashBalances[hash] * feePercentage / 100
+        
+     // Remove claimAmount from the buried hashBalance
+     hashBalances[hash] = 0;
         
      // Execute events to reflect the changes
      emit Claim(hash, msg.sender, buryBroker[hash]);
