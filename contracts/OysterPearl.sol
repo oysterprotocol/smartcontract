@@ -23,6 +23,8 @@ contract OysterPearl {
   mapping (address => uint256) public balances;
   mapping (address => mapping (address => uint256)) public allowance;
   mapping (bytes32 => bool) public buried;
+  mapping (bytes32 => uint256) public claimed;
+  mapping (bytes32 => uint256) public claimAmountByHash;
 
   // ERC20 event
   event Transfer(address indexed _from, address indexed _to, uint256 _value);
@@ -130,7 +132,7 @@ contract OysterPearl {
     // Prevents accidental lockout
     require(msg.value == 10 ether);
     
-    // refunds security
+    // Refunds security
     director.transfer(10 ether);
 
     // Permanently lock out the director
@@ -178,21 +180,27 @@ contract OysterPearl {
    *
    * When an address is buried; only claimAmount can be withdrawn once per epoch
    */
-   function bury(bytes32 hash) public returns (bool success) {
+   function bury(bytes32 _hash, uint256 _buryEpochs) public returns (bool success) {
      // The hash must be previously unburied
-     require(!buried[hash]);
+     require(!buried[_hash]);
         
      // claimAmount is able to be transferred to this contract
-     require(_transfer(msg.sender, address(this), claimAmount));
+     require(_forceTransfer(msg.sender, address(this), (claimAmount * _buryEpochs)));
         
      // Assign buried PRL to this hash
-     hashBalances[hash] += claimAmount;
+     hashBalances[_hash] += claimAmount;
+     
+     // Assign current claimAmount to claimAmount of this hash
+     claimAmountByHash[_hash] = claimAmount;
         
      // Set buried state to true
-     buried[hash] = true;
+     buried[_hash] = true;
+     
+     // Set initial claim clock to 1
+     claimed[_hash] = 1;
         
      // Execute an event reflecting the change
-     emit Bury(hash, hashBalances[hash]);
+     emit Bury(_hash, hashBalances[_hash]);
      return true;
     }
 
@@ -204,50 +212,98 @@ contract OysterPearl {
    *
    * If a prior claim wasn't made during the current epoch, then claimAmount can be withdrawn
    */
-    function claim(bytes32 hash, bytes32 privateKey, address _payout) public returns (bool success) {
+    function claim(bytes32 _hash, bytes32 _privateKey, address _payout) public returns (bool success) {
      
      // Hash must be hash from private Key
-     require(keccak256(privateKey) == hash);
+     require(keccak256(_privateKey) == _hash);
         
      // The claimed address must have already been buried
-     require(buried[hash]);
+     require(buried[_hash]);
+     
+     // It must be either the first time this address is being claimed or atleast epoch in time has passed
+     require(claimed[_hash] == 1 || (block.timestamp - claimed[_hash]) >= epoch);
         
      // Check if the buried address has enough
-     require(hashBalances[hash] >= claimAmount);
+     require(hashBalances[_hash] >= claimAmountByHash[_hash]);
      
      // Save this for an assertion in the future
-     uint256 previousBalances = hashBalances[hash] + balances[msg.sender] + balances[_payout];
+     uint256 previousBalances = hashBalances[_hash] + balances[msg.sender] + balances[_payout];
+     
+     // Remove claimAmount from the buried hashBalance
+     hashBalances[_hash] -= claimAmountByHash[_hash];
      
      // Remove claimAmount from this contract
-     balances[address(this)] -= hashBalances[hash];
+     balances[address(this)] -= claimAmountByHash[_hash];
      
      // Pay the website owner that invoked the web node that found the PRL seed key
-     balances[_payout] += (hashBalances[hash] * payPercentage) / 100;
+     balances[_payout] += (claimAmountByHash[_hash] * payPercentage) / 100;
         
      // Pay the broker node that unlocks the PRL
-     balances[msg.sender] += (hashBalances[hash] * feePercentage) / 100;
-        
-     // Remove claimAmount from the buried hashBalance
-     hashBalances[hash] = 0;
+     balances[msg.sender] += (claimAmountByHash[_hash] * feePercentage) / 100;
+     
+     // Reset the claim clock to the current block time
+     claimed[_hash] = block.timestamp;
         
      // Execute events to reflect the changes
-     emit Claim(hash, _payout, msg.sender);
+     emit Claim(_hash, _payout, msg.sender);
+     emit Transfer(address(this), _payout, ((claimAmountByHash[_hash] * payPercentage) / 100));
+     emit Transfer(address(this), msg.sender, ((claimAmountByHash[_hash] * feePercentage) / 100));
      
      // Failsafe logic that should never be false
-     assert((hashBalances[hash] + balances[msg.sender] + balances[_payout]) == previousBalances);
+     assert((hashBalances[_hash] + balances[msg.sender] + balances[_payout]) == previousBalances);
     
      return true;
     }
     
-    function getHashBalances(bytes32 hash) public view returns(uint256){
-        return hashBalances[hash];
+  /**
+   * Function that returns he hashBalance of a hash
+   */
+    function getHashBalances(bytes32 _hash) public view returns(uint256){
+     return hashBalances[_hash];
     }
     
+  /**
+   * Function that returns the hash of a key
+   */ 
+    function getHash(bytes32 _privateKey) public pure returns (bytes32){
+     return keccak256(_privateKey);
+    }
+    
+  /**
+   * Internal transfer, can be called by this contract only - for bury function
+   */
+   function _forceTransfer(address _from, address _to, uint _value) internal returns (bool success) {
+       
+     // Prevent transfer to 0x0 address, use burn() instead
+     require(_to != 0x0);
+
+     // Check if the sender has enough
+     require(balances[_from] >= _value);
+
+     // Check for overflows
+     require(balances[_to] + _value > balances[_to]);
+
+     // Save this for an assertion in the future
+     uint256 previousBalances = balances[_from] + balances[_to];
+
+     // Subtract from the sender
+     balances[_from] -= _value;
+
+     // Add the same to the recipient
+     balances[_to] += _value;
+     emit Transfer(_from, _to, _value);
+
+     // Failsafe logic that should never be false
+     assert(balances[_from] + balances[_to] == previousBalances);
+     
+     return true;
+   }
+
 
   /**
    * Internal transfer, can be called by this contract only
    */
-  function _transfer(address _from, address _to, uint _value) internal returns (bool success) {
+   function _transfer(address _from, address _to, uint _value) internal {
 
     // Prevent transfer to 0x0 address, use burn() instead
     require(_to != 0x0);
@@ -270,8 +326,6 @@ contract OysterPearl {
 
     // Failsafe logic that should never be false
     assert(balances[_from] + balances[_to] == previousBalances);
-    
-    return true;
   }
 
   /**
