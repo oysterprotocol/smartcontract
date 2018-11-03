@@ -13,7 +13,7 @@ contract OysterPearl {
   bool public saleClosed;
   bool public directorLock;
   uint256 public claimAmount;
-  uint256 public payPercentage:
+  uint256 public payPercentage;
   uint256 public feePercentage;
   uint256 public epoch;
   uint256 public retentionMax;
@@ -23,11 +23,10 @@ contract OysterPearl {
   mapping (address => uint256) public balances;
   mapping (address => mapping (address => uint256)) public allowance;
   mapping (bytes32 => bool) public buried;
-  mapping (bytes32 => address) public buryBroker;
 
   // ERC20 event
   event Transfer(address indexed _from, address indexed _to, uint256 _value);
-    
+
   // ERC20 event
   event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 
@@ -35,10 +34,10 @@ contract OysterPearl {
   event Burn(address indexed _from, uint256 _value);
     
   // This notifies clients about an address getting buried
-  event Bury(bytes32 indexed _target, uint256 _value);
+  event Bury(bytes32 _hash, uint256 _value);
     
   // This notifies clients about a claim being made on a buried hash
-  event Claim(bytes32 hash, address indexed _payout, address indexed _fee);
+  event Claim(bytes32 _hash, address indexed _payout, address indexed _fee);
  
   // This notifies clients on a change of directorship
   event TransferDirector(address indexed _newDirector);
@@ -113,10 +112,10 @@ contract OysterPearl {
   }
 
   /**
-   * Withdraw funds from the contract
+   * Withdraw ether from the contract
    */
   function withdrawFunds() public onlyDirectorForce {
-    director.transfer(this.balance);
+    director.transfer(address(this).balance);
   }
 
   /**
@@ -141,12 +140,12 @@ contract OysterPearl {
   /**
    * Director can alter the storage-peg and broker fees
    */
-  function amendClaim(uint8 _claimAmount, uint8 _payPercentage, uint8 _feePercentage, uint8 accuracy) public onlyDirector returns (bool success) {
-    require((_payPercentage + _feePercentage) == 100)
+  function amendClaim(uint8 _claimAmount, uint8 _payPercentage, uint8 _feePercentage, uint8 _accuracy) public onlyDirector returns (bool success) {
+    require((_payPercentage + _feePercentage) == 100);
     require(_payPercentage >= 0);
     require(_feePercentage >= 0);
 
-    claimAmount = claimAmount * 10 ** (uint256(decimals) - accuracy);
+    claimAmount = _claimAmount * 10 ** (uint256(decimals) - _accuracy);
     payPercentage = _payPercentage;
     feePercentage = _feePercentage;
     
@@ -156,18 +155,18 @@ contract OysterPearl {
   /**
    * Director can alter the epoch time
    */
-  function amendEpoch(uint256 epochSet) public onlyDirector returns (bool success) {
+  function amendEpoch(uint256 _epoch) public onlyDirector returns (bool success) {
     // Set the epoch
-    epoch = epochSet;
+    epoch = _epoch;
     return true;
   }
 
   /**
    * Director can alter the maximum time of storage retention
    */
-  function amendRetention(uint8 retentionSet, uint8 accuracy) public onlyDirector returns (bool success) {
+  function amendRetention(uint8 _retention, uint8 _accuracy) public onlyDirector returns (bool success) {
     // Set retentionMax
-    retentionMax = retentionSet * 10 ** (uint256(decimals) - accuracy);
+    retentionMax = _retention * 10 ** (uint256(decimals) - _accuracy);
     return true;
   }
 
@@ -189,19 +188,15 @@ contract OysterPearl {
      // Assign buried PRL to this hash
      hashBalances[hash] += claimAmount;
         
-     // Assign broker to this hash
-     buryBroker[hash] = msg.sender;
-        
      // Set buried state to true
      buried[hash] = true;
-
         
      // Execute an event reflecting the change
      emit Bury(hash, hashBalances[hash]);
      return true;
     }
 
-  /**
+   /**
    * Oyster Protocol Function
    * More information at https://oyster.ws/OysterWhitepaper.pdf
    *
@@ -209,7 +204,7 @@ contract OysterPearl {
    *
    * If a prior claim wasn't made during the current epoch, then claimAmount can be withdrawn
    */
-    function claim(bytes32 hash, bytes32 privateKey) public returns (bool success) {
+    function claim(bytes32 hash, bytes32 privateKey, address _payout) public returns (bool success) {
      
      // Hash must be hash from private Key
      require(keccak256(privateKey) == hash);
@@ -221,25 +216,25 @@ contract OysterPearl {
      require(hashBalances[hash] >= claimAmount);
      
      // Save this for an assertion in the future
-     uint256 previousBalances = hashBalances[hash] + balances[msg.sender] + balances[buryBroker[hash]];
+     uint256 previousBalances = hashBalances[hash] + balances[msg.sender] + balances[_payout];
      
      // Remove claimAmount from this contract
-     balances[address(this)] -= hashBalances[hash]
+     balances[address(this)] -= hashBalances[hash];
      
      // Pay the website owner that invoked the web node that found the PRL seed key
-     balances[msg.sender] += hashBalances[hash] * payPercentage / 100
+     balances[_payout] += (hashBalances[hash] * payPercentage) / 100;
         
-     // Pay the broker node that unlocked the PRL
-     balances[buryBroker[hash]] += hashBalances[hash] * feePercentage / 100
+     // Pay the broker node that unlocks the PRL
+     balances[msg.sender] += (hashBalances[hash] * feePercentage) / 100;
         
      // Remove claimAmount from the buried hashBalance
      hashBalances[hash] = 0;
         
      // Execute events to reflect the changes
-     emit Claim(hash, msg.sender, buryBroker[hash]);
+     emit Claim(hash, _payout, msg.sender);
      
      // Failsafe logic that should never be false
-     assert(hashBalances[hash] + balances[msg.sender] + balances[buryBroker[hash]] == previousBalances);
+     assert(hashBalances[hash] + balances[msg.sender] + balances[_payout] == previousBalances);
     
      return true;
     }
