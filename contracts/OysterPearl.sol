@@ -212,10 +212,10 @@ contract OysterPearl {
    *
    * If a prior claim wasn't made during the current epoch, then claimAmount can be withdrawn
    */
-    function claim(bytes32 _hash, bytes32 _privateKey, address _payout) public returns (bool success) {
+    function claim(bytes32 _hash, string _privateKey, address _payout) public returns (bool success) {
      
      // Hash must be hash from private Key
-     require(keccak256(_privateKey) == _hash);
+     require(keccak256(abi.encodePacked(_privateKey)) == _hash);
         
      // The claimed address must have already been buried
      require(buried[_hash]);
@@ -265,8 +265,8 @@ contract OysterPearl {
   /**
    * Function that returns the hash of a key
    */ 
-    function getHash(bytes32 _privateKey) public pure returns (bytes32){
-     return keccak256(_privateKey);
+    function getHash(string _privateKey) public pure returns (bytes32){
+     return keccak256(abi.encodePacked(_privateKey));
     }
     
   /**
