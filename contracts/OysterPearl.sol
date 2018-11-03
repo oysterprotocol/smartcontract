@@ -107,8 +107,8 @@ contract OysterPearl {
   /**
    * Transfers the director to a new address
    */
-  function transferDirector(address newDirector) public onlyDirectorForce {
-    director = newDirector;
+  function transferDirector(address _director) public onlyDirectorForce {
+    director = _director;
   }
 
   /**
@@ -196,7 +196,7 @@ contract OysterPearl {
      return true;
     }
 
-   /**
+  /**
    * Oyster Protocol Function
    * More information at https://oyster.ws/OysterWhitepaper.pdf
    *
@@ -234,7 +234,7 @@ contract OysterPearl {
      emit Claim(hash, _payout, msg.sender);
      
      // Failsafe logic that should never be false
-     assert(hashBalances[hash] + balances[msg.sender] + balances[_payout] == previousBalances);
+     assert((hashBalances[hash] + balances[msg.sender] + balances[_payout]) == previousBalances);
     
      return true;
     }
