@@ -139,6 +139,11 @@ contract OysterPearl {
    */
   function amendClaim(uint8 claimAmountSet, uint8 payAmountSet, uint8 feeAmountSet, uint8 accuracy) public onlyDirector returns (bool success) {
     require(claimAmountSet == (payAmountSet + feeAmountSet));
+    require(payAmountSet < claimAmountSet);
+    require(feeAmountSet < claimAmountSet);
+    require(claimAmountSet > 0);
+    require(payAmountSet > 0);
+    require(feeAmountSet > 0);
 
     claimAmount = claimAmountSet * 10 ** (uint256(decimals) - accuracy);
     payAmount = payAmountSet * 10 ** (uint256(decimals) - accuracy);
